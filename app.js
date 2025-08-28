@@ -69,7 +69,7 @@ function equalizeJobsitePercentages(){
 function updateJobsiteTotal(){
  const total=config.jobsites.reduce((sum,s)=>sum+(s.percentage||0),0);
  const el=document.getElementById('jobsite-percentage-total');
- if(el) el.textContent=`Total: ${total}%`;
+ if(el) el.textContent=`Total Activity: ${total}%`;
 }
 function render(){
  document.getElementById('employee-count').value=config.employees;
