@@ -269,18 +269,21 @@ if(config.jobsites.length===0||config.jobs.length===0){
   }
  });
 // assign flex employees only when jobs are present
+// the flex employee should cover both shifts, not one per shift
 if(extraSlots>0){
  for(let day=0; day<totalDays; day++){
   const pool=vacations[day];
   config.jobsites.forEach(site=>{
-   ['day','night'].forEach(shift=>{
-    const entry=site.schedule[shift][day];
-    if(entry.job){
-     while(entry.employees.length<baseCrew+extraSlots && pool.length>0){
-      entry.employees.push(pool.pop());
-     }
+   const dayEntry=site.schedule.day[day];
+   const nightEntry=site.schedule.night[day];
+   if(dayEntry.job || nightEntry.job){
+    const extras=[];
+    while(extras.length<extraSlots && pool.length>0){
+     extras.push(pool.pop());
     }
-   });
+    if(dayEntry.job) dayEntry.employees.push(...extras);
+    if(nightEntry.job) nightEntry.employees.push(...extras);
+   }
   });
  }
 }
