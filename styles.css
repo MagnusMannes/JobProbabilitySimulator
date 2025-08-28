@@ -1,0 +1,48 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+}
+#top-bar {
+  background: #f0f0f0;
+  padding: 10px;
+  display: flex;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+}
+#controls, #jobs, #jobsites {
+  padding: 10px;
+}
+.note {
+  font-size: 0.9em;
+  color: #555;
+}
+.job-row, .jobsite {
+  margin-top: 10px;
+}
+.job-row input {
+  width: 60px;
+}
+.delete {
+  color: red;
+  cursor: pointer;
+  margin-right: 5px;
+  font-weight: bold;
+}
+.jobsite-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.jobsite-grid {
+  display: grid;
+  grid-template-columns: repeat(365, 20px);
+  grid-template-rows: repeat(2, 20px);
+  overflow-x: auto;
+  border: 1px solid #ccc;
+}
+.jobsite-cell {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #eee;
+}

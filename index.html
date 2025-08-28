@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Employee Rotation & Job Visibility Simulator</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header id="top-bar">
+    <button id="export-config">Export Configuration</button>
+    <button id="import-config">Import Configuration</button>
+    <input type="file" id="import-file" accept="application/json" style="display:none" />
+  </header>
+  <section id="controls">
+    <label>
+      Number of employees:
+      <input type="number" id="employee-count" min="1" />
+    </label>
+    <p class="note">Employees will be re-used randomly if jobsites are missing people.</p>
+    <label>
+      Rotation:
+      <select id="rotation" disabled>
+        <option>2/4 Rotation (14 on: 7 day + 7 night, 28 off)</option>
+      </select>
+    </label>
+    <label>
+      Crew size per job:
+      <select id="crew-size" disabled>
+        <option value="2">2 employees per job</option>
+      </select>
+    </label>
+    <button id="run-simulation">Run Simulation</button>
+  </section>
+  <section id="jobs">
+    <h2>Jobs</h2>
+    <button id="add-job">Add Job</button>
+    <div id="jobs-list"></div>
+  </section>
+  <section id="jobsites">
+    <h2>Jobsites</h2>
+    <button id="add-jobsite">Add Jobsite</button>
+    <div id="jobsites-list"></div>
+  </section>
+  <script src="app.js"></script>
+</body>
+</html>
