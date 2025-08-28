@@ -1,12 +1,12 @@
 (function(){
  const configKey='jobSimConfig';
- let config={
-  employees:10,
-  rotation:'2/4',
-  crewSize:2,
-  jobs:[],
-  jobsites:[]
- };
+let config={
+ employees:10,
+ rotation:'2/4',
+  crewSize:1,
+ jobs:[],
+ jobsites:[]
+};
  function loadConfig(){
   const saved=localStorage.getItem(configKey);
   if(saved){
@@ -43,11 +43,12 @@
   }
   return true;
  }
- function render(){
-  document.getElementById('employee-count').value=config.employees;
-  renderJobs();
-  renderJobsites();
- }
+function render(){
+ document.getElementById('employee-count').value=config.employees;
+ document.getElementById('crew-size').value=config.crewSize;
+ renderJobs();
+ renderJobsites();
+}
  function renderJobs(){
   const list=document.getElementById('jobs-list');
   list.innerHTML='';
@@ -72,15 +73,15 @@
   const list=document.getElementById('jobsites-list');
   list.innerHTML='';
  config.jobsites.forEach(site=>{
-  const container=document.createElement('div');container.className='jobsite';
-  const header=document.createElement('div');header.className='jobsite-header';
-  const del=document.createElement('span');del.className='delete';del.textContent='×';
+ const container=document.createElement('div');container.className='jobsite';
+ const header=document.createElement('div');header.className='jobsite-header';
+ const del=document.createElement('span');del.className='delete';del.textContent='×';
   del.addEventListener('click',()=>{config.jobsites=config.jobsites.filter(s=>s!==site);saveConfig();renderJobsites();});
   const name=document.createElement('span');name.textContent=site.name;site.nameEl=name;
   header.appendChild(del);header.appendChild(name);
   container.appendChild(header);
   const wrapper=document.createElement('div');wrapper.className='jobsite-grid-wrapper';
-  const labels=document.createElement('div');labels.className='shift-labels';labels.innerHTML='<div>Day Shift</div><div>Night Shift</div>';
+  const labels=document.createElement('div');labels.className='shift-labels';labels.innerHTML='<div>Day</div><div>Night</div>';
   const grid=document.createElement('div');grid.className='jobsite-grid';grid.dataset.site=site.name;
   site.dayCells=[];site.nightCells=[];
   for(let d=0;d<365;d++){const cell=document.createElement('div');cell.className='jobsite-cell day';site.dayCells.push(cell);grid.appendChild(cell);}
@@ -114,65 +115,56 @@
   reader.readAsText(file);
  }
 function runSimulation(){
-  const rosterSize=6;
-  const allEmpIds=Array.from({length:config.employees},(_,i)=>i);
-  config.jobsites.forEach(site=>{
-   site.roster=[];
-   const shuffled=allEmpIds.slice().sort(()=>Math.random()-0.5);
-   for(let i=0;i<Math.min(config.crewSize,shuffled.length);i++) site.roster.push(shuffled[i]);
-   const empty=rosterSize-site.roster.length;
-   const names=site.roster.map(id=>`Employee ${id+1}`).join(', ');
-   site.nameEl.textContent=`${site.name} (${names}${empty>0?`, ${empty} empty spots`:''})`;
-   site.schedule={day:Array.from({length:365},()=>({job:null,role:null,employees:[]})),night:Array.from({length:365},()=>({job:null,role:null,employees:[]}))};
-  });
-  if(config.jobsites.length===0||config.jobs.length===0){renderSchedules();return;}
-  config.jobs.forEach(job=>{
-   for(let i=0;i<job.frequency;i++){
-    let attempts=0,placed=false;
-    while(attempts<1000&&!placed){
-     attempts++;
-     const site=randItem(config.jobsites);
-     const startIndex=randInt(0,365*2-1);
-     const maxShiftLen=job.maxDuration*2;
-     let shiftLen=randInt(1,maxShiftLen);
-     let endIndex=startIndex+shiftLen-1;
-     if(endIndex>=365*2) endIndex=365*2-1;
-     const startDay=Math.floor(startIndex/2);const endDay=Math.floor(endIndex/2);
-     let conflict=false;
-     for(let day=startDay;day<=endDay;day++){
-      if(site.schedule.day[day].job||site.schedule.night[day].job){conflict=true;break;}
-     }
-     if(conflict) continue;
-     for(let day=startDay;day<=endDay;day++){
-      for(const shift of ['day','night']){
-       const idx=day*2+(shift==='night'?1:0);
-       const cell=site.schedule[shift][day];
-       let role;
-       if(startDay===endDay){
-        if(startIndex===endIndex){
-         role=idx===startIndex?'start end':'start-span';
-        }else{
-         role=idx===startIndex?'start':'end';
-        }
-       }else if(day===startDay){
-        role=idx===startIndex?'start':'start-span';
-       }else if(day===endDay){
-        role=idx===endIndex?'end':'end-span';
-       }else{
-        role='middle';
-       }
-       cell.job=job.name;
-       cell.role=role;
-       const crew=[];
-       for(let c=0;c<config.crewSize;c++) crew.push(site.roster[c]!==undefined?site.roster[c]:null);
-       cell.employees=crew;
-      }
-     }
-     placed=true;
+ const rosterSize=6;
+ const allEmpIds=Array.from({length:config.employees},(_,i)=>i);
+ config.jobsites.forEach(site=>{
+  site.roster=[];
+  const shuffled=allEmpIds.slice().sort(()=>Math.random()-0.5);
+  const rosterNeeded=config.crewSize*2;
+  for(let i=0;i<Math.min(rosterNeeded,shuffled.length);i++) site.roster.push(shuffled[i]);
+  const empty=rosterSize-site.roster.length;
+  const names=site.roster.map(id=>`Employee ${id+1}`).join(', ');
+  site.nameEl.textContent=`${site.name} (${names}${empty>0?`, ${empty} empty spots`:''})`;
+  site.schedule={day:Array.from({length:365},()=>({job:null,role:'',employees:[]})),night:Array.from({length:365},()=>({job:null,role:'',employees:[]}))};
+ });
+ if(config.jobsites.length===0||config.jobs.length===0){renderSchedules();return;}
+ config.jobs.forEach(job=>{
+  for(let i=0;i<job.frequency;i++){
+   let attempts=0,placed=false;
+   while(attempts<1000&&!placed){
+    attempts++;
+    const site=randItem(config.jobsites);
+    const startDay=randInt(0,364);
+    let duration=randInt(1,job.maxDuration);
+    let endDay=startDay+duration-1;
+    if(endDay>=365) endDay=364;
+    let conflict=false;
+    for(let day=startDay;day<=endDay;day++){
+     if(site.schedule.day[day].job||site.schedule.night[day].job){conflict=true;break;}
     }
+    if(conflict) continue;
+    for(let day=startDay;day<=endDay;day++){
+     let dayRole='',nightRole='';
+     if(startDay===endDay){
+      dayRole='start';nightRole='end';
+     }else if(day===startDay){
+      dayRole='start';nightRole='start';
+     }else if(day===endDay){
+      dayRole='end';nightRole='end';
+     }
+     const dayCrew=[],nightCrew=[];
+     for(let c=0;c<config.crewSize;c++){
+      dayCrew.push(site.roster[c]!==undefined?site.roster[c]:null);
+      nightCrew.push(site.roster[c+config.crewSize]!==undefined?site.roster[c+config.crewSize]:null);
+     }
+     site.schedule.day[day]={job:job.name,role:dayRole,employees:dayCrew};
+     site.schedule.night[day]={job:job.name,role:nightRole,employees:nightCrew};
+    }
+    placed=true;
    }
-  });
-  renderSchedules();
+  }
+ });
+ renderSchedules();
 }
 function renderSchedules(){
  config.jobsites.forEach(site=>{
@@ -193,15 +185,17 @@ function updateCell(el,data,dayIndex,label){
   el.title=`${formatDate(dayIndex)} ${label}: No jobs`;
   return;
  }
- data.role.split(' ').forEach(r=>el.classList.add(r));
- el.textContent=data.employees.map(e=>e!==null?`E${e+1}`:'-').join(',');
- el.title=`${formatDate(dayIndex)} ${label}: ${data.job} (${data.role}) | Employees: ${data.employees.map(e=>e!==null?`Employee ${e+1}`:'Empty').join(', ')}`;
+  if(data.role) data.role.split(' ').forEach(r=>el.classList.add(r));
+  el.textContent=data.employees.map(e=>e!==null?`E${e+1}`:'-').join(',');
+  const roleText=data.role?` (${data.role})`:'';
+  el.title=`${formatDate(dayIndex)} ${label}: ${data.job}${roleText} | Employees: ${data.employees.map(e=>e!==null?`Employee ${e+1}`:'Empty').join(', ')}`;
 }
  function formatDate(dayIndex){const date=new Date(new Date().getFullYear(),0,dayIndex+1);return date.toLocaleDateString();}
  function randItem(arr){return arr[Math.floor(Math.random()*arr.length)];}
  function randInt(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
- document.getElementById('employee-count').addEventListener('change',e=>{config.employees=parseInt(e.target.value,10)||1;saveConfig();});
- document.getElementById('add-job').addEventListener('click',addJob);
+document.getElementById('employee-count').addEventListener('change',e=>{config.employees=parseInt(e.target.value,10)||1;saveConfig();});
+document.getElementById('crew-size').addEventListener('change',e=>{config.crewSize=parseInt(e.target.value,10)||1;saveConfig();});
+document.getElementById('add-job').addEventListener('click',addJob);
  document.getElementById('add-jobsite').addEventListener('click',addJobsite);
  document.getElementById('export-config').addEventListener('click',exportConfig);
  document.getElementById('import-config').addEventListener('click',()=>document.getElementById('import-file').click());
