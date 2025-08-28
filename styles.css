@@ -120,13 +120,22 @@ body {
   line-height: 20px;
 }
 
-#employee-job-table {
+#employee-summary-tables {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+#employee-job-table,
+#job-distribution-table {
   border-collapse: collapse;
   margin-top: 10px;
 }
 
 #employee-job-table th,
-#employee-job-table td {
+#employee-job-table td,
+#job-distribution-table th,
+#job-distribution-table td {
   border: 1px solid #ccc;
   padding: 4px;
   font-size: 12px;
