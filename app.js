@@ -118,19 +118,14 @@ function runSimulation(){
  const totalDays=365;
  const shiftLength=7;
  const vacationLength=28;
- const cycleLength=shiftLength*2+vacationLength; // 7 day + 28 off + 7 night
- const requiredPerSite=config.crewSize*6; // six crews needed for 2/4 rotation
+ const cycleLength=shiftLength*2+vacationLength; // 7 day + 7 night + 28 off
+ const maxPerSite=6; // maximum employees fixed to any jobsite
 
- // assign employees evenly across jobsites
+ // assign employees, capping each jobsite at six
  const allEmpIds=Array.from({length:config.employees},(_,i)=>i);
- let index=0;
- config.jobsites.forEach((site,siteIdx)=>{
-  const base=Math.floor(config.employees/config.jobsites.length);
-  const extra=siteIdx<config.employees%config.jobsites.length?1:0;
-  const count=Math.min(base+extra,allEmpIds.length-index);
-  site.roster=allEmpIds.slice(index,index+count);
-  index+=count;
-  const empty=requiredPerSite-site.roster.length;
+ config.jobsites.forEach(site=>{
+  site.roster=allEmpIds.splice(0,Math.min(maxPerSite,allEmpIds.length));
+  const empty=maxPerSite-site.roster.length;
   const names=site.roster.map(id=>`Employee ${id+1}`).join(', ');
   site.nameEl.textContent=`${site.name} (${names}${empty>0?`, ${empty} empty spots`:''})`;
   site.schedule={day:Array.from({length:totalDays},()=>({job:null,role:'',employees:[]})),
@@ -141,16 +136,15 @@ function runSimulation(){
  const vacations=Array.from({length:totalDays},()=>[]);
  config.jobsites.forEach(site=>{
   site.roster.forEach((emp,idx)=>{
-   const group=Math.floor(idx/config.crewSize); // determines offset block
-   const offset=group*shiftLength;
+   const offset=idx*shiftLength;
    for(let day=0;day<totalDays;day++){
     const phase=(day-offset+cycleLength)%cycleLength;
     if(phase<shiftLength){
      site.schedule.day[day].employees.push(emp);
-    }else if(phase<shiftLength+vacationLength){
-     vacations[day].push(emp);
-    }else{
+    }else if(phase<shiftLength*2){
      site.schedule.night[day].employees.push(emp);
+    }else{
+     vacations[day].push(emp);
     }
    }
   });
@@ -172,35 +166,33 @@ function runSimulation(){
  // if no jobs or jobsites, render schedule now
  if(config.jobsites.length===0||config.jobs.length===0){renderSchedules();return;}
 
- // place jobs without altering employee assignments
+ // place jobs with distinct start/stop shifts and minimum one-day length
  config.jobs.forEach(job=>{
   for(let i=0;i<job.frequency;i++){
    let attempts=0,placed=false;
    while(attempts<1000&&!placed){
     attempts++;
     const site=randItem(config.jobsites);
-    const startDay=randInt(0,totalDays-1);
-    let duration=randInt(1,job.maxDuration);
-    let endDay=startDay+duration-1;
-    if(endDay>=totalDays) endDay=totalDays-1;
+    const duration=randInt(1,Math.min(job.maxDuration,totalDays-1)); // duration in days
+    const startDay=randInt(0,totalDays-duration-1);
+    const endDay=startDay+duration;
+    const startShift=randItem(['day','night']);
+    const endShift=randItem(['day','night']);
+    const startIndex=startDay*2+(startShift==='day'?0:1);
+    const endIndex=endDay*2+(endShift==='day'?0:1);
     let conflict=false;
-    for(let day=startDay;day<=endDay;day++){
-     if(site.schedule.day[day].job||site.schedule.night[day].job){conflict=true;break;}
+    for(let s=startIndex;s<=endIndex;s++){
+     const d=Math.floor(s/2);
+     const sh=s%2===0?'day':'night';
+     if(site.schedule[sh][d].job){conflict=true;break;}
     }
     if(conflict) continue;
-    for(let day=startDay;day<=endDay;day++){
-     let dayRole='',nightRole='';
-     if(startDay===endDay){
-      dayRole='start';nightRole='end';
-     }else if(day===startDay){
-      dayRole='start';nightRole='start';
-     }else if(day===endDay){
-      dayRole='end';nightRole='end';
-     }
-     const dayData=site.schedule.day[day];
-     const nightData=site.schedule.night[day];
-     dayData.job=job.name;dayData.role=dayRole;
-     nightData.job=job.name;nightData.role=nightRole;
+    for(let s=startIndex;s<=endIndex;s++){
+     const d=Math.floor(s/2);
+     const sh=s%2===0?'day':'night';
+     const data=site.schedule[sh][d];
+     data.job=job.name;
+     data.role=s===startIndex?'start':s===endIndex?'end':'';
     }
     placed=true;
    }
