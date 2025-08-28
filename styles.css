@@ -106,3 +106,15 @@ body {
   padding: 4px;
   font-size: 12px;
 }
+
+#employee-job-table th {
+  cursor: pointer;
+}
+
+#employee-job-table th.sorted-asc::after {
+  content: ' \25B2';
+}
+
+#employee-job-table th.sorted-desc::after {
+  content: ' \25BC';
+}

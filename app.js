@@ -219,22 +219,22 @@ const maxPerSite=6; // maximum employees fixed to any jobsite
  // gather job stats per employee
  const stats=Array.from({length:config.employees},()=>({}));
  config.jobsites.forEach(site=>{
-  ['day','night'].forEach(shift=>{
-   for(let d=0;d<totalDays;d++){
-    const entry=site.schedule[shift][d];
-    if(!entry.job) continue;
-    entry.employees.forEach(emp=>{
-     if(emp===null) return;
-     const s=stats[emp];
-     if(!s[entry.job]) s[entry.job]={count:0,details:[]};
-     s[entry.job].count++;
-     s[entry.job].details.push(`${site.name} on ${formatDate(d)} ${shift}`);
-    });
-   }
-  });
+ ['day','night'].forEach(shift=>{
+  for(let d=0;d<totalDays;d++){
+   const entry=site.schedule[shift][d];
+   if(!entry.job || !(entry.role==='start'||entry.role==='end')) continue;
+   entry.employees.forEach(emp=>{
+    if(emp===null) return;
+    const s=stats[emp];
+    if(!s[entry.job]) s[entry.job]={count:0,details:[]};
+    s[entry.job].count++;
+    s[entry.job].details.push(`${site.name} on ${formatDate(d)} ${shift} (${entry.role})`);
+   });
+  }
  });
- renderSchedules();
- renderEmployeeSummary(stats);
+});
+renderSchedules();
+renderEmployeeSummary(stats);
 }
 function renderSchedules(){
  config.jobsites.forEach(site=>{
@@ -254,8 +254,10 @@ function renderEmployeeSummary(stats){
  const jobNames=config.jobs.map(j=>j.name);
  const thead=document.createElement('thead');
  const headRow=document.createElement('tr');
- const empTh=document.createElement('th');empTh.textContent='Employee';headRow.appendChild(empTh);
- jobNames.forEach(name=>{const th=document.createElement('th');th.textContent=name;headRow.appendChild(th);});
+ const empTh=document.createElement('th');empTh.textContent='Employee';
+ empTh.addEventListener('click',()=>sortTable(table,0));
+ headRow.appendChild(empTh);
+ jobNames.forEach((name,idx)=>{const th=document.createElement('th');th.textContent=name;th.addEventListener('click',()=>sortTable(table,idx+1));headRow.appendChild(th);});
  thead.appendChild(headRow);table.appendChild(thead);
  const tbody=document.createElement('tbody');
  stats.forEach((stat,idx)=>{
@@ -268,9 +270,30 @@ function renderEmployeeSummary(stats){
    if(data) td.title=data.details.join('\n');
    tr.appendChild(td);
   });
-  tbody.appendChild(tr);
+ tbody.appendChild(tr);
  });
  table.appendChild(tbody);
+}
+
+function sortTable(table,columnIndex){
+ const tbody=table.querySelector('tbody');
+ const rows=Array.from(tbody.querySelectorAll('tr'));
+ const asc=!(table.dataset.sortColumn==columnIndex && table.dataset.sortOrder==='asc');
+ rows.sort((a,b)=>{
+  const aText=a.children[columnIndex].textContent;
+  const bText=b.children[columnIndex].textContent;
+  const aVal=columnIndex===0?parseInt(aText.replace(/\D/g,''),10):parseInt(aText,10);
+  const bVal=columnIndex===0?parseInt(bText.replace(/\D/g,''),10):parseInt(bText,10);
+  if(aVal===bVal) return 0;
+  return asc?(aVal>bVal?1:-1):(aVal<bVal?1:-1);
+ });
+ rows.forEach(r=>tbody.appendChild(r));
+ table.dataset.sortColumn=columnIndex;
+ table.dataset.sortOrder=asc?'asc':'desc';
+ table.querySelectorAll('th').forEach((th,i)=>{
+  th.classList.remove('sorted-asc','sorted-desc');
+  if(i===columnIndex) th.classList.add(asc?'sorted-asc':'sorted-desc');
+ });
 }
 function updateCell(el,data,dayIndex,label){
  el.className='jobsite-cell '+label.toLowerCase();
