@@ -116,8 +116,9 @@ function render(){
  }
 function runSimulation(){
  const totalDays=365;
- const cycleLength=42; // 7 nights + 7 days + 28 off
  const shiftLength=7;
+ const vacationLength=28;
+ const cycleLength=shiftLength*2+vacationLength; // 7 day + 28 off + 7 night
  const requiredPerSite=config.crewSize*6; // six crews needed for 2/4 rotation
 
  // assign employees evenly across jobsites
@@ -145,11 +146,11 @@ function runSimulation(){
    for(let day=0;day<totalDays;day++){
     const phase=(day-offset+cycleLength)%cycleLength;
     if(phase<shiftLength){
-     site.schedule.night[day].employees.push(emp);
-    }else if(phase<shiftLength*2){
      site.schedule.day[day].employees.push(emp);
-    }else{
+    }else if(phase<shiftLength+vacationLength){
      vacations[day].push(emp);
+    }else{
+     site.schedule.night[day].employees.push(emp);
     }
    }
   });
@@ -221,7 +222,7 @@ function renderSchedules(){
 }
 function updateCell(el,data,dayIndex,label){
  el.className='jobsite-cell '+label.toLowerCase();
- const employeeText=data.employees.map(e=>e!==null?`E${e+1}`:'-').join(',');
+ const employeeText=data.employees.map(e=>e!==null?`E${e+1}`:'-').join(', ');
  el.textContent=employeeText;
  if(!data.job){
   el.title=`${formatDate(dayIndex)} ${label}: No jobs | Employees: ${data.employees.map(e=>e!==null?`Employee ${e+1}`:'Empty').join(', ')}`;
