@@ -232,6 +232,7 @@ if(config.jobsites.length===0||config.jobs.length===0){
   renderSchedules();
   const emptyStats=Array.from({length:config.employees},()=>({}));
   renderEmployeeSummary(emptyStats);
+  renderJobDistribution(emptyStats);
   return;
  }
 
@@ -302,6 +303,7 @@ config.jobsites.forEach(site=>{
 });
 renderSchedules();
 renderEmployeeSummary(stats);
+renderJobDistribution(stats);
 }
 function renderSchedules(){
  config.jobsites.forEach(site=>{
@@ -356,6 +358,52 @@ function renderEmployeeSummary(stats){
   }
   tr.appendChild(profTd);
   tbody.appendChild(tr);
+ });
+ table.appendChild(tbody);
+}
+
+function renderJobDistribution(stats){
+ const table=document.getElementById('job-distribution-table');
+ table.innerHTML='';
+ const total=stats.length;
+ let proficient=0;
+ stats.forEach(stat=>{
+  let minDiff=Infinity;
+  config.jobs.forEach(job=>{
+   const count=stat[job.name]?stat[job.name].count:0;
+   const diff=count-(job.target||0);
+   if(diff<minDiff) minDiff=diff;
+  });
+  if(minDiff>=0) proficient++;
+ });
+ const thead=document.createElement('thead');
+ const profRow=document.createElement('tr');
+ const profTh=document.createElement('th');
+ profTh.colSpan=7;
+ profTh.textContent=`Proficient: ${total?((proficient/total*100).toFixed(1)):0}%`;
+ profRow.appendChild(profTh);
+ thead.appendChild(profRow);
+ const headRow=document.createElement('tr');
+ const jobTh=document.createElement('th');jobTh.textContent='Job';headRow.appendChild(jobTh);
+ for(let i=1;i<=6;i++){const th=document.createElement('th');th.textContent=`${i}x`;headRow.appendChild(th);}
+ thead.appendChild(headRow);
+ table.appendChild(thead);
+ const tbody=document.createElement('tbody');
+ config.jobs.forEach(job=>{
+  const row=document.createElement('tr');
+  const nameTd=document.createElement('td');nameTd.textContent=job.name;row.appendChild(nameTd);
+  const counts=Array(6).fill(0);
+  stats.forEach(stat=>{
+   const c=stat[job.name]?stat[job.name].count:0;
+   if(c>=1){counts[Math.min(c,6)-1]++;}
+  });
+  counts.forEach(cnt=>{
+   const td=document.createElement('td');
+   const pct=total?((cnt/total*100).toFixed(1)):0;
+   td.textContent=`${pct}%`;
+   row.appendChild(td);
+  });
+  tbody.appendChild(row);
  });
  table.appendChild(tbody);
 }
