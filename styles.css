@@ -20,6 +20,31 @@ body {
 .job-row, .jobsite {
   margin-top: 10px;
 }
+
+.jobsite {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.jobsite-percent {
+  display: flex;
+  align-items: center;
+}
+
+.jobsite-percent input {
+  width: 50px;
+}
+
+.jobsite-content {
+  display: flex;
+  flex-direction: column;
+}
+
+#jobsite-percentage-total {
+  margin-top: 10px;
+  font-weight: bold;
+}
 .job-row input {
   width: 60px;
 }
