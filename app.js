@@ -221,15 +221,15 @@ function renderSchedules(){
 }
 function updateCell(el,data,dayIndex,label){
  el.className='jobsite-cell '+label.toLowerCase();
+ const employeeText=data.employees.map(e=>e!==null?`E${e+1}`:'-').join(',');
+ el.textContent=employeeText;
  if(!data.job){
-  el.textContent='';
-  el.title=`${formatDate(dayIndex)} ${label}: No jobs`;
+  el.title=`${formatDate(dayIndex)} ${label}: No jobs | Employees: ${data.employees.map(e=>e!==null?`Employee ${e+1}`:'Empty').join(', ')}`;
   return;
  }
-  if(data.role) data.role.split(' ').forEach(r=>el.classList.add(r));
-  el.textContent=data.employees.map(e=>e!==null?`E${e+1}`:'-').join(',');
-  const roleText=data.role?` (${data.role})`:'';
-  el.title=`${formatDate(dayIndex)} ${label}: ${data.job}${roleText} | Employees: ${data.employees.map(e=>e!==null?`Employee ${e+1}`:'Empty').join(', ')}`;
+ if(data.role) data.role.split(' ').forEach(r=>el.classList.add(r));
+ const roleText=data.role?` (${data.role})`:'';
+ el.title=`${formatDate(dayIndex)} ${label}: ${data.job}${roleText} | Employees: ${data.employees.map(e=>e!==null?`Employee ${e+1}`:'Empty').join(', ')}`;
 }
  function formatDate(dayIndex){const date=new Date(new Date().getFullYear(),0,dayIndex+1);return date.toLocaleDateString();}
  function randItem(arr){return arr[Math.floor(Math.random()*arr.length)];}
