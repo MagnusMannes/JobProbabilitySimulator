@@ -71,21 +71,24 @@
  function renderJobsites(){
   const list=document.getElementById('jobsites-list');
   list.innerHTML='';
-  config.jobsites.forEach(site=>{
-   const container=document.createElement('div');container.className='jobsite';
-   const header=document.createElement('div');header.className='jobsite-header';
-   const del=document.createElement('span');del.className='delete';del.textContent='×';
-   del.addEventListener('click',()=>{config.jobsites=config.jobsites.filter(s=>s!==site);saveConfig();renderJobsites();});
-   const name=document.createElement('span');name.textContent=site.name;
-   header.appendChild(del);header.appendChild(name);
-   container.appendChild(header);
-   const grid=document.createElement('div');grid.className='jobsite-grid';grid.dataset.site=site.name;
-   site.dayCells=[];site.nightCells=[];
-   for(let d=0;d<365;d++){const cell=document.createElement('div');cell.className='jobsite-cell day';site.dayCells.push(cell);grid.appendChild(cell);} 
-   for(let d=0;d<365;d++){const cell=document.createElement('div');cell.className='jobsite-cell night';site.nightCells.push(cell);grid.appendChild(cell);} 
-   container.appendChild(grid);list.appendChild(container);
-  });
- }
+ config.jobsites.forEach(site=>{
+  const container=document.createElement('div');container.className='jobsite';
+  const header=document.createElement('div');header.className='jobsite-header';
+  const del=document.createElement('span');del.className='delete';del.textContent='×';
+  del.addEventListener('click',()=>{config.jobsites=config.jobsites.filter(s=>s!==site);saveConfig();renderJobsites();});
+  const name=document.createElement('span');name.textContent=site.name;site.nameEl=name;
+  header.appendChild(del);header.appendChild(name);
+  container.appendChild(header);
+  const wrapper=document.createElement('div');wrapper.className='jobsite-grid-wrapper';
+  const labels=document.createElement('div');labels.className='shift-labels';labels.innerHTML='<div>Day Shift</div><div>Night Shift</div>';
+  const grid=document.createElement('div');grid.className='jobsite-grid';grid.dataset.site=site.name;
+  site.dayCells=[];site.nightCells=[];
+  for(let d=0;d<365;d++){const cell=document.createElement('div');cell.className='jobsite-cell day';site.dayCells.push(cell);grid.appendChild(cell);}
+  for(let d=0;d<365;d++){const cell=document.createElement('div');cell.className='jobsite-cell night';site.nightCells.push(cell);grid.appendChild(cell);}
+  wrapper.appendChild(labels);wrapper.appendChild(grid);
+  container.appendChild(wrapper);list.appendChild(container);
+ });
+}
  function addJob(){
   const name=prompt('Job name?');if(!name) return;
   if(config.jobs.some(j=>j.name===name)){alert('Job name must be unique');return;}
@@ -110,56 +113,90 @@
   };
   reader.readAsText(file);
  }
- function runSimulation(){
-  config.jobsites.forEach(site=>{site.schedule={day:Array.from({length:365},()=>({jobs:[],filled:0,required:0})),night:Array.from({length:365},()=>({jobs:[],filled:0,required:0}))};});
+function runSimulation(){
+  const rosterSize=6;
+  const allEmpIds=Array.from({length:config.employees},(_,i)=>i);
+  config.jobsites.forEach(site=>{
+   site.roster=[];
+   const shuffled=allEmpIds.slice().sort(()=>Math.random()-0.5);
+   for(let i=0;i<Math.min(config.crewSize,shuffled.length);i++) site.roster.push(shuffled[i]);
+   const empty=rosterSize-site.roster.length;
+   const names=site.roster.map(id=>`Employee ${id+1}`).join(', ');
+   site.nameEl.textContent=`${site.name} (${names}${empty>0?`, ${empty} empty spots`:''})`;
+   site.schedule={day:Array.from({length:365},()=>({job:null,role:null,employees:[]})),night:Array.from({length:365},()=>({job:null,role:null,employees:[]}))};
+  });
   if(config.jobsites.length===0||config.jobs.length===0){renderSchedules();return;}
-  const crewSize=config.crewSize;
   config.jobs.forEach(job=>{
    for(let i=0;i<job.frequency;i++){
-    const site=randItem(config.jobsites);
-    const shift=Math.random()<0.5?'day':'night';
-    const duration=randInt(1,job.maxDuration);
-    const start=randInt(0,364);
-    for(let d=start;d<Math.min(start+duration,365);d++){
-     const cell=site.schedule[shift][d];
-     cell.jobs.push(job.name);cell.required+=crewSize;
-    }
-   }
-  });
-  const employees=[];
-  for(let i=0;i<config.employees;i++){const offset=Math.floor(Math.random()*42);employees.push({id:i,offset});}
-  function shiftFor(emp,day){const pos=(day+emp.offset)%42;if(pos<7) return 'day';if(pos<14) return 'night';return 'off';}
-  for(let day=0;day<365;day++){
-   for(const site of config.jobsites){
-    for(const shift of ['day','night']){
-     const cell=site.schedule[shift][day];
-     if(cell.required>0){
-      let pool=employees.filter(e=>shiftFor(e,day)===shift);
-      if(pool.length<cell.required){const others=employees.filter(e=>shiftFor(e,day)!==shift);pool=pool.concat(others);} 
-      for(let c=0;c<cell.required;c++){const emp=pool[Math.floor(Math.random()*pool.length)];cell.filled++;}
+    let attempts=0,placed=false;
+    while(attempts<1000&&!placed){
+     attempts++;
+     const site=randItem(config.jobsites);
+     const startIndex=randInt(0,365*2-1);
+     const maxShiftLen=job.maxDuration*2;
+     let shiftLen=randInt(1,maxShiftLen);
+     let endIndex=startIndex+shiftLen-1;
+     if(endIndex>=365*2) endIndex=365*2-1;
+     const startDay=Math.floor(startIndex/2);const endDay=Math.floor(endIndex/2);
+     let conflict=false;
+     for(let day=startDay;day<=endDay;day++){
+      if(site.schedule.day[day].job||site.schedule.night[day].job){conflict=true;break;}
      }
+     if(conflict) continue;
+     for(let day=startDay;day<=endDay;day++){
+      for(const shift of ['day','night']){
+       const idx=day*2+(shift==='night'?1:0);
+       const cell=site.schedule[shift][day];
+       let role;
+       if(startDay===endDay){
+        if(startIndex===endIndex){
+         role=idx===startIndex?'start end':'start-span';
+        }else{
+         role=idx===startIndex?'start':'end';
+        }
+       }else if(day===startDay){
+        role=idx===startIndex?'start':'start-span';
+       }else if(day===endDay){
+        role=idx===endIndex?'end':'end-span';
+       }else{
+        role='middle';
+       }
+       cell.job=job.name;
+       cell.role=role;
+       const crew=[];
+       for(let c=0;c<config.crewSize;c++) crew.push(site.roster[c]!==undefined?site.roster[c]:null);
+       cell.employees=crew;
+      }
+     }
+     placed=true;
     }
    }
-  }
-  renderSchedules();
- }
- function renderSchedules(){
-  config.jobsites.forEach(site=>{
-   if(!site.schedule){
-    if(site.dayCells){site.dayCells.forEach((cell,idx)=>{cell.removeAttribute('style');cell.title=formatDate(idx)+' Day: No jobs';});site.nightCells.forEach((cell,idx)=>{cell.removeAttribute('style');cell.title=formatDate(idx)+' Night: No jobs';});}
-    return;
-   }
-   for(let d=0;d<365;d++){
-    const dayData=site.schedule.day[d];const dayCell=site.dayCells[d];updateCell(dayCell,dayData,d,'Day');
-    const nightData=site.schedule.night[d];const nightCell=site.nightCells[d];updateCell(nightCell,nightData,d,'Night');
-   }
   });
+  renderSchedules();
+}
+function renderSchedules(){
+ config.jobsites.forEach(site=>{
+  if(!site.schedule){
+   if(site.dayCells){site.dayCells.forEach((cell,idx)=>{cell.className='jobsite-cell day';cell.textContent='';cell.title=formatDate(idx)+' Day: No jobs';});site.nightCells.forEach((cell,idx)=>{cell.className='jobsite-cell night';cell.textContent='';cell.title=formatDate(idx)+' Night: No jobs';});}
+   return;
+  }
+  for(let d=0;d<365;d++){
+   const dayData=site.schedule.day[d];const dayCell=site.dayCells[d];updateCell(dayCell,dayData,d,'Day');
+   const nightData=site.schedule.night[d];const nightCell=site.nightCells[d];updateCell(nightCell,nightData,d,'Night');
+  }
+ });
+}
+function updateCell(el,data,dayIndex,label){
+ el.className='jobsite-cell '+label.toLowerCase();
+ if(!data.job){
+  el.textContent='';
+  el.title=`${formatDate(dayIndex)} ${label}: No jobs`;
+  return;
  }
- function updateCell(el,data,dayIndex,label){
-  if(data.required===0){el.style.background='';el.title=`${formatDate(dayIndex)} ${label}: No jobs`;return;}
-  const coverage=data.filled/data.required;const hue=coverage*120;el.style.background=`hsl(${hue},70%,60%)`;
-  el.title=`${formatDate(dayIndex)} ${label}: ${data.jobs.join(', ')} | ${data.filled}/${data.required} filled`;
- }
+ data.role.split(' ').forEach(r=>el.classList.add(r));
+ el.textContent=data.employees.map(e=>e!==null?`E${e+1}`:'-').join(',');
+ el.title=`${formatDate(dayIndex)} ${label}: ${data.job} (${data.role}) | Employees: ${data.employees.map(e=>e!==null?`Employee ${e+1}`:'Empty').join(', ')}`;
+}
  function formatDate(dayIndex){const date=new Date(new Date().getFullYear(),0,dayIndex+1);return date.toLocaleDateString();}
  function randItem(arr){return arr[Math.floor(Math.random()*arr.length)];}
  function randInt(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
