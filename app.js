@@ -174,6 +174,8 @@ function runSimulation(){
  const vacationLength=28;
 const cycleLength=shiftLength*2+vacationLength; // 7 day + 7 night + 28 off
 const maxPerSite=6; // maximum employees fixed to any jobsite
+const baseCrew=Math.floor(config.crewSize);
+const extraSlots=Math.ceil(config.crewSize)-baseCrew;
 
  // assign employees evenly across jobsites up to six per site
  config.jobsites.forEach(site=>{site.roster=[];});
@@ -214,19 +216,19 @@ const maxPerSite=6; // maximum employees fixed to any jobsite
 
  // borrow employees from vacation to fill empty slots
  for(let day=0;day<totalDays;day++){
-  const pool=vacations[day];
+ const pool=vacations[day];
   config.jobsites.forEach(site=>{
    const dayArr=site.schedule.day[day].employees;
-   while(dayArr.length<config.crewSize&&pool.length>0){dayArr.push(pool.pop());}
-   while(dayArr.length<config.crewSize){dayArr.push(null);}
+   while(dayArr.length<baseCrew&&pool.length>0){dayArr.push(pool.pop());}
+   while(dayArr.length<baseCrew){dayArr.push(null);}
    const nightArr=site.schedule.night[day].employees;
-   while(nightArr.length<config.crewSize&&pool.length>0){nightArr.push(pool.pop());}
-   while(nightArr.length<config.crewSize){nightArr.push(null);}
+   while(nightArr.length<baseCrew&&pool.length>0){nightArr.push(pool.pop());}
+   while(nightArr.length<baseCrew){nightArr.push(null);}
   });
  }
 
- // if no jobs or jobsites, render schedule now
- if(config.jobsites.length===0||config.jobs.length===0){
+// if no jobs or jobsites, render schedule now
+if(config.jobsites.length===0||config.jobs.length===0){
   renderSchedules();
   const emptyStats=Array.from({length:config.employees},()=>({}));
   renderEmployeeSummary(emptyStats);
@@ -263,14 +265,30 @@ const maxPerSite=6; // maximum employees fixed to any jobsite
     }
     placed=true;
    }
- }
+  }
  });
- // gather job stats per employee
- const stats=Array.from({length:config.employees},()=>({}));
- config.jobsites.forEach(site=>{
- ['day','night'].forEach(shift=>{
-  for(let d=0;d<totalDays;d++){
-   const entry=site.schedule[shift][d];
+// assign flex employees only when jobs are present
+if(extraSlots>0){
+ for(let day=0; day<totalDays; day++){
+  const pool=vacations[day];
+  config.jobsites.forEach(site=>{
+   ['day','night'].forEach(shift=>{
+    const entry=site.schedule[shift][day];
+    if(entry.job){
+     while(entry.employees.length<baseCrew+extraSlots && pool.length>0){
+      entry.employees.push(pool.pop());
+     }
+    }
+   });
+  });
+ }
+}
+// gather job stats per employee
+const stats=Array.from({length:config.employees},()=>({}));
+config.jobsites.forEach(site=>{
+['day','night'].forEach(shift=>{
+ for(let d=0;d<totalDays;d++){
+  const entry=site.schedule[shift][d];
    if(!entry.job || !(entry.role==='start'||entry.role==='end')) continue;
    entry.employees.forEach(emp=>{
     if(emp===null) return;
