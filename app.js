@@ -7,25 +7,32 @@ let config={
  jobs:[],
  jobsites:[]
 };
- function loadConfig(){
-  const saved=localStorage.getItem(configKey);
-  if(saved){
-   try{const parsed=JSON.parse(saved);if(validateConfig(parsed))config=parsed;}catch(e){}
-  }
+function loadConfig(){
+ const saved=localStorage.getItem(configKey);
+ if(saved){
+  try{
+   const parsed=JSON.parse(saved);
+   if(validateConfig(parsed)){
+    parsed.jobs.forEach(j=>{if(typeof j.target!=='number') j.target=0;});
+    config=parsed;
+   }
+  }catch(e){}
  }
+}
  function getCleanConfig(){
   return{
    employees:config.employees,
    rotation:config.rotation,
    crewSize:config.crewSize,
-   jobs:config.jobs.map(j=>({name:j.name,frequency:j.frequency,maxDuration:j.maxDuration})),
+   jobs:config.jobs.map(j=>({name:j.name,frequency:j.frequency,maxDuration:j.maxDuration,target:j.target||0})),
    jobsites:config.jobsites.map(s=>({name:s.name}))
   };
  }
  function saveConfig(){localStorage.setItem(configKey,JSON.stringify(getCleanConfig()));}
  function validateConfig(obj){
   if(typeof obj!=='object'||obj===null) return false;
-  if(!Number.isInteger(obj.employees)||obj.employees<1) return false;
+ if(!Number.isInteger(obj.employees)||obj.employees<1) return false;
+ if(typeof obj.crewSize!=='number'||obj.crewSize<=0) return false;
   if(!Array.isArray(obj.jobs)||!Array.isArray(obj.jobsites)) return false;
   const jobNames=new Set();
   for(const j of obj.jobs){
@@ -34,6 +41,7 @@ let config={
    jobNames.add(j.name);
    if(!Number.isInteger(j.frequency)||j.frequency<0) return false;
    if(!Number.isInteger(j.maxDuration)||j.maxDuration<1) return false;
+   if(j.target!==undefined && (!Number.isInteger(j.target)||j.target<0)) return false;
   }
   const siteNames=new Set();
   for(const s of obj.jobsites){
@@ -53,6 +61,7 @@ function render(){
   const list=document.getElementById('jobs-list');
   list.innerHTML='';
   config.jobs.forEach(job=>{
+   if(typeof job.target!=='number') job.target=0;
    const row=document.createElement('div');row.className='job-row';
    const del=document.createElement('span');del.className='delete';del.textContent='×';
    del.addEventListener('click',()=>{config.jobs=config.jobs.filter(j=>j!==job);saveConfig();renderJobs();});
@@ -65,7 +74,11 @@ function render(){
    const durInput=document.createElement('input');durInput.type='number';durInput.min='1';durInput.value=job.maxDuration;
    durInput.addEventListener('change',()=>{job.maxDuration=parseInt(durInput.value,10)||1;saveConfig();});
    durLabel.appendChild(durInput);
-   row.appendChild(del);row.appendChild(name);row.appendChild(freqLabel);row.appendChild(durLabel);
+   const targetLabel=document.createElement('label');targetLabel.textContent=' Proficiency Target ';
+   const targetInput=document.createElement('input');targetInput.type='number';targetInput.min='0';targetInput.value=job.target;
+   targetInput.addEventListener('change',()=>{job.target=parseInt(targetInput.value,10)||0;saveConfig();});
+   targetLabel.appendChild(targetInput);
+   row.appendChild(del);row.appendChild(name);row.appendChild(freqLabel);row.appendChild(durLabel);row.appendChild(targetLabel);
    list.appendChild(row);
   });
  }
@@ -98,8 +111,8 @@ function render(){
  function addJob(){
   const name=prompt('Job name?');if(!name) return;
   if(config.jobs.some(j=>j.name===name)){alert('Job name must be unique');return;}
-  config.jobs.push({name,frequency:0,maxDuration:1});saveConfig();renderJobs();
- }
+  config.jobs.push({name,frequency:0,maxDuration:1,target:0});saveConfig();renderJobs();
+  }
  function addJobsite(){
   const name=prompt('Jobsite name?');if(!name) return;
   if(config.jobsites.some(s=>s.name===name)){alert('Jobsite name must be unique');return;}
@@ -258,6 +271,7 @@ function renderEmployeeSummary(stats){
  empTh.addEventListener('click',()=>sortTable(table,0));
  headRow.appendChild(empTh);
  jobNames.forEach((name,idx)=>{const th=document.createElement('th');th.textContent=name;th.addEventListener('click',()=>sortTable(table,idx+1));headRow.appendChild(th);});
+ const profTh=document.createElement('th');profTh.textContent='Proficiency';profTh.addEventListener('click',()=>sortTable(table,jobNames.length+1));headRow.appendChild(profTh);
  thead.appendChild(headRow);table.appendChild(thead);
  const tbody=document.createElement('tbody');
  stats.forEach((stat,idx)=>{
@@ -270,7 +284,24 @@ function renderEmployeeSummary(stats){
    if(data) td.title=data.details.join('\n');
    tr.appendChild(td);
   });
- tbody.appendChild(tr);
+  let minDiff=Infinity;
+  config.jobs.forEach(job=>{
+   const count=stat[job.name]?stat[job.name].count:0;
+   const diff=count-(job.target||0);
+   if(diff<minDiff) minDiff=diff;
+  });
+  const profTd=document.createElement('td');
+  if(minDiff>=0){
+   profTd.textContent='✔';
+   profTd.className='proficiency-met';
+   profTd.dataset.value=0;
+  }else{
+   profTd.textContent=minDiff;
+   profTd.className='proficiency-miss';
+   profTd.dataset.value=minDiff;
+  }
+  tr.appendChild(profTd);
+  tbody.appendChild(tr);
  });
  table.appendChild(tbody);
 }
@@ -280,8 +311,10 @@ function sortTable(table,columnIndex){
  const rows=Array.from(tbody.querySelectorAll('tr'));
  const asc=!(table.dataset.sortColumn==columnIndex && table.dataset.sortOrder==='asc');
  rows.sort((a,b)=>{
-  const aText=a.children[columnIndex].textContent;
-  const bText=b.children[columnIndex].textContent;
+  const aCell=a.children[columnIndex];
+  const bCell=b.children[columnIndex];
+  const aText=aCell.dataset.value!==undefined?aCell.dataset.value:aCell.textContent;
+  const bText=bCell.dataset.value!==undefined?bCell.dataset.value:bCell.textContent;
   const aVal=columnIndex===0?parseInt(aText.replace(/\D/g,''),10):parseInt(aText,10);
   const bVal=columnIndex===0?parseInt(bText.replace(/\D/g,''),10):parseInt(bText,10);
   if(aVal===bVal) return 0;
@@ -311,7 +344,7 @@ function updateCell(el,data,dayIndex,label){
  function randItem(arr){return arr[Math.floor(Math.random()*arr.length)];}
  function randInt(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
 document.getElementById('employee-count').addEventListener('change',e=>{config.employees=parseInt(e.target.value,10)||1;saveConfig();});
-document.getElementById('crew-size').addEventListener('change',e=>{config.crewSize=parseInt(e.target.value,10)||1;saveConfig();});
+document.getElementById('crew-size').addEventListener('change',e=>{config.crewSize=parseFloat(e.target.value)||1;saveConfig();});
 document.getElementById('add-job').addEventListener('click',addJob);
  document.getElementById('add-jobsite').addEventListener('click',addJobsite);
  document.getElementById('export-config').addEventListener('click',exportConfig);
