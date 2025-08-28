@@ -65,16 +65,15 @@ body {
   justify-content: center;
   font-size: 10px;
 }
-.jobsite-cell.start,
-.jobsite-cell.end,
-.jobsite-cell.start-span,
-.jobsite-cell.end-span {
-  background: #00ff00;
+.jobsite-cell.day {
+  border-color: #fff9c4;
 }
-.jobsite-cell.middle {
-  background: #ccffcc;
+.jobsite-cell.night {
+  border-color: #ffe0b2;
 }
-.jobsite-cell.start,
+.jobsite-cell.start {
+  background: #90ee90;
+}
 .jobsite-cell.end {
-  border: 2px solid #006400;
+  background: #ffcccb;
 }
