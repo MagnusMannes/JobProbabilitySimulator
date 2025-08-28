@@ -77,3 +77,32 @@ body {
 .jobsite-cell.end {
   background: #ffcccb;
 }
+
+.grid-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.week-labels {
+  display: grid;
+  grid-template-columns: repeat(365, 20px);
+  font-size: 10px;
+}
+
+.week-labels div {
+  text-align: center;
+  height: 20px;
+  line-height: 20px;
+}
+
+#employee-job-table {
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+#employee-job-table th,
+#employee-job-table td {
+  border: 1px solid #ccc;
+  padding: 4px;
+  font-size: 12px;
+}

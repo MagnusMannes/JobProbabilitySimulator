@@ -82,12 +82,17 @@ function render(){
   container.appendChild(header);
   const wrapper=document.createElement('div');wrapper.className='jobsite-grid-wrapper';
   const labels=document.createElement('div');labels.className='shift-labels';labels.innerHTML='<div>Day</div><div>Night</div>';
-  const grid=document.createElement('div');grid.className='jobsite-grid';grid.dataset.site=site.name;
-  site.dayCells=[];site.nightCells=[];
-  for(let d=0;d<365;d++){const cell=document.createElement('div');cell.className='jobsite-cell day';site.dayCells.push(cell);grid.appendChild(cell);}
-  for(let d=0;d<365;d++){const cell=document.createElement('div');cell.className='jobsite-cell night';site.nightCells.push(cell);grid.appendChild(cell);}
-  wrapper.appendChild(labels);wrapper.appendChild(grid);
-  container.appendChild(wrapper);list.appendChild(container);
+ const gridContainer=document.createElement('div');gridContainer.className='grid-container';
+ const grid=document.createElement('div');grid.className='jobsite-grid';grid.dataset.site=site.name;
+ site.dayCells=[];site.nightCells=[];
+ for(let d=0;d<365;d++){const cell=document.createElement('div');cell.className='jobsite-cell day';site.dayCells.push(cell);grid.appendChild(cell);}
+ for(let d=0;d<365;d++){const cell=document.createElement('div');cell.className='jobsite-cell night';site.nightCells.push(cell);grid.appendChild(cell);}
+ gridContainer.appendChild(grid);
+ const weekLabels=document.createElement('div');weekLabels.className='week-labels';
+ for(let w=0,pos=0;pos<365;w++,pos+=7){const cell=document.createElement('div');cell.textContent=`Week ${w+1}`;const span=Math.min(7,365-pos);cell.style.gridColumn=`span ${span}`;weekLabels.appendChild(cell);}
+ gridContainer.appendChild(weekLabels);
+ wrapper.appendChild(labels);wrapper.appendChild(gridContainer);
+ container.appendChild(wrapper);list.appendChild(container);
  });
 }
  function addJob(){
@@ -118,13 +123,21 @@ function runSimulation(){
  const totalDays=365;
  const shiftLength=7;
  const vacationLength=28;
- const cycleLength=shiftLength*2+vacationLength; // 7 day + 7 night + 28 off
- const maxPerSite=6; // maximum employees fixed to any jobsite
+const cycleLength=shiftLength*2+vacationLength; // 7 day + 7 night + 28 off
+const maxPerSite=6; // maximum employees fixed to any jobsite
 
- // assign employees, capping each jobsite at six
- const allEmpIds=Array.from({length:config.employees},(_,i)=>i);
+ // assign employees evenly across jobsites up to six per site
+ config.jobsites.forEach(site=>{site.roster=[];});
+ let empId=0;
+ while(empId<config.employees){
+  let assigned=false;
+  for(const site of config.jobsites){
+   if(site.roster.length<maxPerSite){site.roster.push(empId++);assigned=true;}
+   if(empId>=config.employees) break;
+  }
+  if(!assigned) break;
+ }
  config.jobsites.forEach(site=>{
-  site.roster=allEmpIds.splice(0,Math.min(maxPerSite,allEmpIds.length));
   const empty=maxPerSite-site.roster.length;
   const names=site.roster.map(id=>`Employee ${id+1}`).join(', ');
   site.nameEl.textContent=`${site.name} (${names}${empty>0?`, ${empty} empty spots`:''})`;
@@ -140,9 +153,9 @@ function runSimulation(){
    for(let day=0;day<totalDays;day++){
     const phase=(day-offset+cycleLength)%cycleLength;
     if(phase<shiftLength){
-     site.schedule.day[day].employees.push(emp);
-    }else if(phase<shiftLength*2){
      site.schedule.night[day].employees.push(emp);
+    }else if(phase<shiftLength*2){
+     site.schedule.day[day].employees.push(emp);
     }else{
      vacations[day].push(emp);
     }
@@ -164,7 +177,12 @@ function runSimulation(){
  }
 
  // if no jobs or jobsites, render schedule now
- if(config.jobsites.length===0||config.jobs.length===0){renderSchedules();return;}
+ if(config.jobsites.length===0||config.jobs.length===0){
+  renderSchedules();
+  const emptyStats=Array.from({length:config.employees},()=>({}));
+  renderEmployeeSummary(emptyStats);
+  return;
+ }
 
  // place jobs with distinct start/stop shifts and minimum one-day length
  config.jobs.forEach(job=>{
@@ -196,9 +214,27 @@ function runSimulation(){
     }
     placed=true;
    }
-  }
+ }
+ });
+ // gather job stats per employee
+ const stats=Array.from({length:config.employees},()=>({}));
+ config.jobsites.forEach(site=>{
+  ['day','night'].forEach(shift=>{
+   for(let d=0;d<totalDays;d++){
+    const entry=site.schedule[shift][d];
+    if(!entry.job) continue;
+    entry.employees.forEach(emp=>{
+     if(emp===null) return;
+     const s=stats[emp];
+     if(!s[entry.job]) s[entry.job]={count:0,details:[]};
+     s[entry.job].count++;
+     s[entry.job].details.push(`${site.name} on ${formatDate(d)} ${shift}`);
+    });
+   }
+  });
  });
  renderSchedules();
+ renderEmployeeSummary(stats);
 }
 function renderSchedules(){
  config.jobsites.forEach(site=>{
@@ -211,6 +247,30 @@ function renderSchedules(){
    const nightData=site.schedule.night[d];const nightCell=site.nightCells[d];updateCell(nightCell,nightData,d,'Night');
   }
  });
+}
+function renderEmployeeSummary(stats){
+ const table=document.getElementById('employee-job-table');
+ table.innerHTML='';
+ const jobNames=config.jobs.map(j=>j.name);
+ const thead=document.createElement('thead');
+ const headRow=document.createElement('tr');
+ const empTh=document.createElement('th');empTh.textContent='Employee';headRow.appendChild(empTh);
+ jobNames.forEach(name=>{const th=document.createElement('th');th.textContent=name;headRow.appendChild(th);});
+ thead.appendChild(headRow);table.appendChild(thead);
+ const tbody=document.createElement('tbody');
+ stats.forEach((stat,idx)=>{
+  const tr=document.createElement('tr');
+  const nameTd=document.createElement('td');nameTd.textContent=`Employee ${idx+1}`;tr.appendChild(nameTd);
+  jobNames.forEach(job=>{
+   const td=document.createElement('td');
+   const data=stat[job];
+   td.textContent=data?data.count:0;
+   if(data) td.title=data.details.join('\n');
+   tr.appendChild(td);
+  });
+  tbody.appendChild(tr);
+ });
+ table.appendChild(tbody);
 }
 function updateCell(el,data,dayIndex,label){
  el.className='jobsite-cell '+label.toLowerCase();
